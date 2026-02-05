@@ -1,29 +1,43 @@
-Deployment notes for backend (CDK Python)
+Deployment notes for backend (CloudFormation)
 
-Required environment variables / GitHub secrets for CI:
+This backend is deployed as:
+- DynamoDB tables: `user`, `communitycards`
+- Lambda function: `knit-bingo-api`
+- Lambda Function URL (CORS open)
+
+## Required GitHub secrets (CI)
 - AWS_ACCESS_KEY_ID
 - AWS_SECRET_ACCESS_KEY
 - AWS_REGION
 
-The CDK Python app is in `backend/`.
+## Artifact bucket
+Lambda code must be uploaded as a zip to S3 so CloudFormation can reference it.
 
-To deploy locally:
+Bucket:
+- `bingoknitting-artifacts`
 
-1. Activate the virtualenv:
-   source backend/.venv/bin/activate
+Key:
+- `backend/lambda.zip`
 
-2. Install dependencies:
-   python -m pip install -r backend/requirements.txt
+The GitHub workflow `.github/workflows/deploy-backend-cfn.yml` will:
+1) zip `backend/lambda/`
+2) upload it to the artifact bucket
+3) deploy `backend/template.yaml`
 
-3. Synthesize / deploy:
-   cd backend
-   npx cdk synth
-   npx cdk deploy --require-approval=never
+## Deploy locally
 
-In CI (GitHub Actions), use the AWS creds from repository secrets and run the same commands.
+```bash
+# zip and upload
+cd backend/lambda
+zip -r ../lambda.zip .
+aws s3 cp ../lambda.zip s3://bingoknitting-artifacts/backend/lambda.zip
 
-Environment variables used by Lambda (set via CDK):
-- TABLE_NAME (created by CDK)
-- COMMUNITY_CARDS_TABLE (created by CDK)
+# deploy stack
+aws cloudformation deploy \
+  --template-file backend/template.yaml \
+  --stack-name knit-bingo-backend \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides LambdaCodeBucket=bingoknitting-artifacts LambdaCodeKey=backend/lambda.zip
+```
 
-No further secrets are required by the Lambda for v1, because email sending is simulated.
+After deploy, read the **FunctionUrl** output and set it as your frontend `VITE_API_URL`.
