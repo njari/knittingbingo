@@ -15,7 +15,7 @@ class BackendStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # DynamoDB
-        table = dynamodb.Table(
+        usertable = dynamodb.Table(
             self,
             "UserTable",
             table_name="user",
@@ -64,11 +64,11 @@ class BackendStack(Stack):
             handler="handler.handler",
             code=_lambda.Code.from_asset("lambda"),
             environment={
-                "TABLE_NAME": table.table_name,
+                "TABLE_NAME": usertable.table_name,
                 "COMMUNITY_CARDS_TABLE": community_cards.table_name,
             },
         )
-        table.grant_read_write_data(api_fn)
+        usertable.grant_read_write_data(api_fn)
         community_cards.grant_read_write_data(api_fn)
 
         # API Gateway
@@ -86,11 +86,9 @@ class BackendStack(Stack):
             ),
         )
 
-        authorizer = apigw.CognitoUserPoolsAuthorizer(
-            self,
-            "Authorizer",
-            cognito_user_pools=[user_pool],
-        )
+        # NOTE: We are currently using a custom magic-code token (stored in DynamoDB)
+        # and are not attaching a Cognito authorizer to API Gateway.
+        # If/when we switch to Cognito-based auth, reintroduce a Cognito authorizer.
 
         auth = api.root.add_resource("auth")
         magic_link = auth.add_resource("magic-link")
