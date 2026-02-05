@@ -1,12 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import './App.css'
 import { BingoBoard } from './components/BingoBoard'
 import { CommunityCarousel, type CommunityCarouselCard } from './components/CommunityCarousel'
+import { createPortal } from 'react-dom'
 
 type MagicLinkResponse = { magicLink: string }
 type MagicLinkCallbackResponse = { token: string; userId: string; email: string }
 
 type BoardCard = { id: string; text: string; backgroundColor: string }
+
+type FlyGhost = {
+  id: string
+  text: string
+  backgroundColor: string
+  from: { x: number; y: number; w: number; h: number }
+  to: { x: number; y: number }
+}
 
 const DEFAULT_COLORS = [
   '#FFF4E6',
@@ -55,8 +64,13 @@ function App() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [magicLink, setMagicLink] = useState<string | null>(null)
+  const [magicCode, setMagicCode] = useState('')
   const [token, setToken] = useState<string | null>(null)
   const [communityCards, setCommunityCards] = useState<CommunityCarouselCard[]>(() => DEFAULT_COMMUNITY_CARDS)
+  const [toast, setToast] = useState<string | null>(null)
+  const [pulseEmail, setPulseEmail] = useState(false)
+  const [flyGhost, setFlyGhost] = useState<FlyGhost | null>(null)
+  const flyLayerRef = useRef<HTMLDivElement | null>(null)
 
   const [draftBoard, setDraftBoard] = useState<BoardCard[]>(() => createEmptyBoard())
   const [savedBoard, setSavedBoard] = useState<BoardCard[]>(() => createEmptyBoard())
@@ -91,6 +105,7 @@ function App() {
       return
     }
     setMagicLink(data.magicLink)
+    setMagicCode('')
   }
 
   async function saveBoardToBackend() {
@@ -100,7 +115,7 @@ function App() {
       return
     }
     if (!token) {
-      setError('You must log in first (missing magic-link token).')
+      showAuthToast()
       return
     }
     const resp = await fetch(`${apiUrl}bingo3x3`, {
@@ -128,11 +143,15 @@ function App() {
     }
   }
 
-  async function tossCardToCommunity(index: number) {
-    if (!apiUrl || !token) return
+  async function contributeCardToCommunity(index: number, cardEl: HTMLElement) {
+    if (!apiUrl) return
+    if (!token) {
+      showAuthToast()
+      return
+    }
     const card = draftBoard[index]
     if (!card) return
-    await fetch(`${apiUrl}toss`, {
+    const resp = await fetch(`${apiUrl}contribute`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -140,15 +159,37 @@ function App() {
       },
       body: JSON.stringify({ card }),
     })
+
+    if (resp.ok) {
+      const rect = cardEl.getBoundingClientRect()
+      const scroller = document.querySelector('[data-community-scroller]') as HTMLElement | null
+      const toRect = scroller?.getBoundingClientRect()
+      if (toRect) {
+        setFlyGhost({
+          id: crypto.randomUUID(),
+          text: card.text,
+          backgroundColor: card.backgroundColor,
+          from: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
+          to: { x: toRect.left + 36, y: toRect.top + 48 },
+        })
+      }
+    }
     // Refresh carousel (don’t clear local card)
     await loadCommunityCards()
+  }
+
+  function showAuthToast() {
+    setToast('Log in to contribute and save your bingo.')
+    setPulseEmail(true)
+    window.setTimeout(() => setPulseEmail(false), 900)
+    // Auto-dismiss toast
+    window.setTimeout(() => setToast(null), 2800)
   }
 
   return (
     <div style={{ display: 'flex', maxWidth: 1040, margin: '0 auto', gap: 28 }}>
       <div style={{ flex: 1, padding: 24, textAlign: 'left' }}>
-      <h1>Make Your Knitting Bingo</h1>
-      <p>Sign in with a magic link (simulated for now).</p>
+      <h1>Make Your Own Knitting Bingo</h1>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '16px 0' }}>
         <button
@@ -170,7 +211,7 @@ function App() {
           cards={draftBoard}
           editable
           tossable
-          onCardToss={tossCardToCommunity}
+          onCardContribute={contributeCardToCommunity}
           onCardTextChange={(index, nextText) => {
             setDraftBoard((prev) => {
               const next = [...prev]
@@ -187,29 +228,43 @@ function App() {
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@example.com"
         type="email"
-        style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc' }}
+        style={{
+          width: '100%',
+          padding: 10,
+          borderRadius: 6,
+          border: '1px solid #ccc',
+          outline: pulseEmail ? '3px solid rgba(164, 214, 255, 0.85)' : undefined,
+          boxShadow: pulseEmail ? '0 0 0 6px rgba(164, 214, 255, 0.22)' : undefined,
+          transition: 'box-shadow 200ms ease, outline 200ms ease',
+        }}
       />
       {emailHasPlus ? (
         <div style={{ color: 'crimson', marginTop: 8 }}>Email must not contain '+' characters.</div>
       ) : null}
 
-      <button
-        onClick={requestMagicLink}
-        style={{ marginTop: 12, padding: '10px 14px', borderRadius: 6 }}
-        disabled={!email || emailHasPlus}
-      >
-        Send magic link
-      </button>
+      {!magicLink ? (
+        <button
+          onClick={requestMagicLink}
+          style={{ marginTop: 12, padding: '10px 14px', borderRadius: 6 }}
+          disabled={!email || emailHasPlus}
+        >
+          Send magic code
+        </button>
+      ) : null}
 
       {error ? <div style={{ color: 'crimson', marginTop: 12 }}>{error}</div> : null}
 
       {magicLink ? (
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontWeight: 600 }}>Magic link (simulated):</div>
-          <a href={magicLink} style={{ wordBreak: 'break-all' }}>
-            {magicLink}
-          </a>
-          <div style={{ marginTop: 10 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>Enter magic code</label>
+          <input
+            value={magicCode}
+            onChange={(e) => setMagicCode(e.target.value)}
+            placeholder="Paste code from your email"
+            style={{ width: '100%', padding: 10, borderRadius: 6, border: '1px solid #ccc' }}
+          />
+
+          <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
             <button
               type="button"
               style={{ padding: '8px 12px', borderRadius: 6 }}
@@ -217,13 +272,12 @@ function App() {
                 try {
                   setError(null)
                   if (!apiUrl) throw new Error('Missing VITE_API_URL')
-                  const url = new URL(magicLink, window.location.origin)
-                  const code = url.searchParams.get('code')
-                  if (!code) throw new Error('Missing code in magic link')
+                  const code = magicCode.trim()
+                  if (!code) throw new Error('Enter your magic code')
                   const resp = await fetch(`${apiUrl}auth/magic-link-callback?code=${encodeURIComponent(code)}`)
                   const data = (await resp.json()) as Partial<MagicLinkCallbackResponse> & { message?: string }
                   if (!resp.ok || !data.token) {
-                    throw new Error(data.message ?? `Callback failed (${resp.status})`)
+                    throw new Error(data.message ?? `Verification failed (${resp.status})`)
                   }
                   setToken(data.token)
                   await loadCommunityCards()
@@ -232,17 +286,132 @@ function App() {
                 }
               }}
             >
-              Simulate clicking link (log in)
+              Verify & log in
+            </button>
+
+            <button
+              type="button"
+              style={{ padding: '8px 12px', borderRadius: 6 }}
+              onClick={() => {
+                // allow restarting the flow
+                setMagicLink(null)
+                setMagicCode('')
+              }}
+            >
+              Start over
             </button>
           </div>
-          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
-            Note: this link is relative; once deployed you’ll want to create a full URL and email it.
+
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+            We sent you a code. Paste it here to sign in.
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 22,
+            transform: 'translateX(-50%)',
+            background: 'rgba(20,20,20,0.9)',
+            color: 'white',
+            padding: '10px 14px',
+            borderRadius: 10,
+            fontSize: 13,
+            zIndex: 2000,
+          }}
+          role="status"
+          onAnimationEnd={() => setToast(null)}
+        >
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div>{toast}</div>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'white',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
           </div>
         </div>
       ) : null}
       </div>
 
       <CommunityCarousel cards={communityCards} />
+
+      {createPortal(
+        <div
+          ref={flyLayerRef}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 2500,
+          }}
+        >
+          {flyGhost ? (
+            <div
+              style={{
+                position: 'absolute',
+                left: flyGhost.from.x,
+                top: flyGhost.from.y,
+                width: flyGhost.from.w,
+                height: flyGhost.from.h,
+                transformOrigin: 'top left',
+                background: flyGhost.backgroundColor,
+                borderRadius: 18,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: 14,
+                textAlign: 'center',
+                padding: 14,
+                boxShadow: '0 14px 34px rgba(0,0,0,0.16)',
+                animation: 'contributeFly 520ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards',
+              }}
+              onAnimationEnd={() => setFlyGhost(null)}
+            >
+              {flyGhost.text}
+            </div>
+          ) : null}
+          <style>
+            {flyGhost
+              ? `
+            @keyframes contributeFly {
+              0% {
+                transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+              }
+              65% {
+                transform:
+                  translate3d(${flyGhost.to.x - flyGhost.from.x}px, ${flyGhost.to.y - flyGhost.from.y - 30}px, 0)
+                  rotate(6deg)
+                  scale(0.85);
+              }
+              100% {
+                transform:
+                  translate3d(${flyGhost.to.x - flyGhost.from.x}px, ${flyGhost.to.y - flyGhost.from.y}px, 0)
+                  rotate(10deg)
+                  scale(0.28);
+                filter: blur(0.4px);
+                opacity: 0;
+              }
+            }
+          `
+              : ''}
+          </style>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

@@ -13,7 +13,7 @@ export type BingoBoardProps = {
   editable?: boolean
   onCardTextChange?: (index: number, nextText: string) => void
   tossable?: boolean
-  onCardToss?: (index: number) => void
+  onCardContribute?: (index: number, cardEl: HTMLElement) => void
 }
 
 export function BingoBoard({
@@ -21,7 +21,7 @@ export function BingoBoard({
   editable = false,
   onCardTextChange,
   tossable = false,
-  onCardToss,
+  onCardContribute,
 }: BingoBoardProps) {
   if (cards.length !== 9) {
     // Keep it strict for v1: 3x3 only
@@ -38,7 +38,7 @@ export function BingoBoard({
           textColor={c.textColor}
           editable={editable}
           tossable={tossable}
-          onToss={() => onCardToss?.(idx)}
+          onContribute={(cardEl) => onCardContribute?.(idx, cardEl)}
           onTextChange={(next) => onCardTextChange?.(idx, next)}
         />
       ))}

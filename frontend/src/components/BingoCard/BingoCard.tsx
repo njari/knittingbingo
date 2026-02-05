@@ -16,7 +16,7 @@ export type BingoCardProps = {
   tossable?: boolean
 
   /** Called when user clicks Toss (after animation starts) */
-  onToss?: () => void
+  onContribute?: (cardEl: HTMLElement) => void
 }
 
 export function BingoCard({
@@ -27,19 +27,17 @@ export function BingoCard({
   editable = false,
   onTextChange,
   tossable = false,
-  onToss,
+  onContribute,
 }: BingoCardProps) {
   const [isTossing, setIsTossing] = useState(false)
-
-  function toss() {
-    if (isTossing) return
-    setIsTossing(true)
-    onToss?.()
-  }
 
   if (editable) {
     return (
       <div
+        ref={(el) => {
+          // keep react happy; no-op. (we pass element to contribute callback via event)
+          void el
+        }}
         className={[styles.card, isTossing ? styles.toss : ''].filter(Boolean).join(' ')}
         style={{ backgroundColor, color: textColor }}
         onAnimationEnd={() => setIsTossing(false)}
@@ -51,8 +49,17 @@ export function BingoCard({
           onChange={(e) => onTextChange?.(e.target.value)}
         />
         {tossable ? (
-          <button type="button" className={styles.tossButton} onClick={toss} aria-label="Toss">
-            Toss
+          <button
+            type="button"
+            className={styles.tossButton}
+            onClick={(e) => {
+              const cardEl = e.currentTarget.closest(`.${styles.card}`) as HTMLElement | null
+              // Animate only after API success; for now, we just request contribution.
+              if (cardEl) onContribute?.(cardEl)
+            }}
+            aria-label="Contribute"
+          >
+            Contribute
           </button>
         ) : null}
       </div>

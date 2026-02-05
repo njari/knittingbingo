@@ -46,6 +46,7 @@ export function CommunityCarousel({ cards }: { cards: CommunityCarouselCard[] })
       <div
         className={styles.scroller}
         ref={scrollerRef}
+        data-community-scroller
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onFocus={() => setIsPaused(true)}
