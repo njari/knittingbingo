@@ -37,6 +37,7 @@ COMMUNITY_CARDS_TABLE = os.environ["COMMUNITY_CARDS_TABLE"]
 ddb = boto3.resource("dynamodb")
 table = ddb.Table(TABLE_NAME)
 community_table = ddb.Table(COMMUNITY_CARDS_TABLE)
+OPEN_APIS = ["/auth/magic-link", "/auth/magic-link-callback", "/community/cards"]
 
 
 BINGO_3X3_KEY = "bingo3x3"
@@ -137,7 +138,7 @@ def handler(event, context):
         body = json.loads(body_raw) if isinstance(body_raw, str) else body_raw
         # Auth endpoints are public, game endpoints require cognito claims.
         user_id = None
-        if resource not in ("/auth/magic-link", "/auth/magic-link-callback"):
+        if resource not in OPEN_APIS:
             user_id = _user_id(event)
 
         # POST /auth/magic-link
@@ -244,27 +245,27 @@ def handler(event, context):
             save_bingo_3x3_for_user(user_id=user_id, cards=cards)
             return _json(200, {"ok": True})
 
-        # POST /toss
-        if method == "POST" and resource == "/toss":
+        # POST /contribute
+        if method == "POST" and resource == "/contribute":
             token = _bearer_token(event)
             user_id = _user_id_for_token(token)
 
             card = Bingo3x3Card.from_dict(body.get("card"))
             now = datetime.now(timezone.utc).isoformat()
-            toss_id = str(uuid.uuid4())
+            contribute_id = str(uuid.uuid4())
 
             community_table.put_item(
                 Item={
                     "pk": "COMMUNITY",
-                    "sk": f"TOSS#{now}#{toss_id}",
-                    "tossId": toss_id,
-                    "tossedAt": now,
+                    "sk": f"CONTRIBUTE#{now}#{contribute_id}",
+                    "contributeId": contribute_id,
+                    "contributedAt": now,
                     "userId": user_id,
                     "card": card,
                 }
             )
 
-            return _json(201, {"ok": True, "tossId": toss_id})
+            return _json(201, {"ok": True, "contributeId": contribute_id})
 
         # GET /community/cards
         if method == "GET" and resource == "/community/cards":
@@ -272,9 +273,9 @@ def handler(event, context):
             resp = community_table.scan(Limit=50)
             items = resp.get("Items") or []
 
-            # sort newest first (by tossedAt if present, else by sk)
+            # sort newest first (by contributedAt if present, else by sk)
             def _sort_key(x: dict):
-                return x.get("tossedAt") or x.get("sk") or ""
+                return x.get("contributedAt") or x.get("tossedAt") or x.get("sk") or ""
 
             items.sort(key=_sort_key, reverse=True)
             cards = []

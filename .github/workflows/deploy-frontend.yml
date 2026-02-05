@@ -1,4 +1,4 @@
-name: Deploy frontend to GitHub Pages
+name: Deploy frontend to S3
 
 on:
   push:
@@ -17,6 +17,13 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm ci
@@ -25,8 +32,6 @@ jobs:
         working-directory: ./frontend
         run: npm run build
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./frontend/dist
+      - name: Sync to S3
+        run: |
+          aws s3 sync ./frontend/dist s3://bingoknitting/ --delete

@@ -97,7 +97,7 @@ class BackendStack(Stack):
         magic_link_cb = auth.add_resource("magic-link-callback")
 
         bingo3x3 = api.root.add_resource("bingo3x3")
-        toss = api.root.add_resource("toss")
+        contribute = api.root.add_resource("contribute")
         community = api.root.add_resource("community")
         community_cards_api = community.add_resource("cards")
 
@@ -110,8 +110,8 @@ class BackendStack(Stack):
         # Bingo board save (authorized via magic-link token)
         bingo3x3.add_method("PUT", integration)
 
-        # Toss (authorized via magic-link token)
-        toss.add_method("POST", integration)
+        # Contribute (authorized via magic-link token)
+        contribute.add_method("POST", integration)
 
         # Community cards list (public)
         community_cards_api.add_method("GET", integration)
