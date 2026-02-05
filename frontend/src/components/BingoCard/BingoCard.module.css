@@ -1,0 +1,120 @@
+.card {
+  width: 100%;
+  min-height: 92px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 18px;
+  padding: 14px 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.card:active {
+  transform: translateY(0px) scale(0.99);
+  filter: brightness(0.98);
+}
+
+.card:focus-visible {
+  outline: 3px solid rgba(115, 168, 255, 0.55);
+  outline-offset: 2px;
+}
+
+.text {
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 600;
+  text-align: center;
+  word-break: break-word;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tossButton {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tossButton:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.toss {
+  animation: toss 700ms ease-in forwards;
+  z-index: 1000;
+}
+
+.toss::after {
+  /* subtle paper texture overlay when it reaches the viewer */
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.45), transparent 40%),
+    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.35), transparent 45%),
+    radial-gradient(circle at 30% 80%, rgba(0, 0, 0, 0.06), transparent 55%);
+  mix-blend-mode: soft-light;
+}
+
+@keyframes toss {
+  0% {
+    transform: translateZ(0) scale(1) rotate(0deg);
+    filter: blur(0px);
+  }
+  25% {
+    transform: scale(0.88) rotate(-6deg);
+  }
+  40% {
+    transform: scale(0.82) rotate(8deg);
+  }
+  55% {
+    transform: scale(0.72) rotate(-12deg);
+  }
+  70% {
+    transform: translateY(-12px) scale(0.78) rotate(10deg);
+  }
+  100% {
+    /* “throw at the screen”: scale up fast and fly toward the viewer */
+    transform: translateY(-40px) scale(8) rotate(18deg);
+    opacity: 1;
+    filter: blur(0.2px);
+  }
+}
