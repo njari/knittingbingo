@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 import { BingoBoard } from './components/BingoBoard'
+import { CommunityCarousel, type CommunityCarouselCard } from './components/CommunityCarousel'
 
 type MagicLinkResponse = { magicLink: string }
 type MagicLinkCallbackResponse = { token: string; userId: string; email: string }
@@ -19,6 +20,28 @@ const DEFAULT_COLORS = [
   '#FFF1E6',
 ]
 
+const DEFAULT_COMMUNITY_CARDS: CommunityCarouselCard[] = Array.from({ length: 15 }, (_, i) => ({
+  id: `default-${i + 1}`,
+  text: [
+    'Tangled yarn? Breathe.',
+    'Try a new stitch today',
+    'Knit 5 rows mindfully',
+    'Fix one tiny mistake',
+    'Cast on something bold',
+    'Swatch before you commit',
+    'Take a progress photo',
+    'Block it. Trust the process.',
+    'Weave in ends (future you says thanks)',
+    'Celebrate small wins',
+    'Learn one new technique',
+    'Use the fancy yarn',
+    'Count your stitches twice',
+    'Make it cozy',
+    'Toss perfectionism into the universe',
+  ][i]!,
+  backgroundColor: DEFAULT_COLORS[i % DEFAULT_COLORS.length]!,
+}))
+
 function createEmptyBoard(): BoardCard[] {
   return Array.from({ length: 9 }, (_, i) => ({
     id: String(i + 1),
@@ -33,6 +56,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [magicLink, setMagicLink] = useState<string | null>(null)
   const [token, setToken] = useState<string | null>(null)
+  const [communityCards, setCommunityCards] = useState<CommunityCarouselCard[]>(() => DEFAULT_COMMUNITY_CARDS)
 
   const [draftBoard, setDraftBoard] = useState<BoardCard[]>(() => createEmptyBoard())
   const [savedBoard, setSavedBoard] = useState<BoardCard[]>(() => createEmptyBoard())
@@ -95,9 +119,35 @@ function App() {
     setSavedBoard(draftBoard)
   }
 
+  async function loadCommunityCards() {
+    if (!apiUrl) return
+    const resp = await fetch(`${apiUrl}community/cards`)
+    const data = (await resp.json()) as { cards?: CommunityCarouselCard[] }
+    if (resp.ok && Array.isArray(data.cards)) {
+      setCommunityCards(data.cards.length ? data.cards : DEFAULT_COMMUNITY_CARDS)
+    }
+  }
+
+  async function tossCardToCommunity(index: number) {
+    if (!apiUrl || !token) return
+    const card = draftBoard[index]
+    if (!card) return
+    await fetch(`${apiUrl}toss`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ card }),
+    })
+    // Refresh carousel (don’t clear local card)
+    await loadCommunityCards()
+  }
+
   return (
-    <div style={{ maxWidth: 520, margin: '0 auto', padding: 24, textAlign: 'left' }}>
-      <h1>Knit Bingo</h1>
+    <div style={{ display: 'flex', maxWidth: 1040, margin: '0 auto', gap: 28 }}>
+      <div style={{ flex: 1, padding: 24, textAlign: 'left' }}>
+      <h1>Make Your Knitting Bingo</h1>
       <p>Sign in with a magic link (simulated for now).</p>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '16px 0' }}>
@@ -120,6 +170,7 @@ function App() {
           cards={draftBoard}
           editable
           tossable
+          onCardToss={tossCardToCommunity}
           onCardTextChange={(index, nextText) => {
             setDraftBoard((prev) => {
               const next = [...prev]
@@ -175,6 +226,7 @@ function App() {
                     throw new Error(data.message ?? `Callback failed (${resp.status})`)
                   }
                   setToken(data.token)
+                  await loadCommunityCards()
                 } catch (e) {
                   setError(e instanceof Error ? e.message : String(e))
                 }
@@ -188,6 +240,9 @@ function App() {
           </div>
         </div>
       ) : null}
+      </div>
+
+      <CommunityCarousel cards={communityCards} />
     </div>
   )
 }
