@@ -9,6 +9,12 @@ type MagicLinkCallbackResponse = { token: string; userId: string; email: string 
 
 type BoardCard = { id: string; text: string; backgroundColor: string }
 
+type BoardCardMeta = {
+  movedFromCommunityId?: string
+  movedFromCommunityText?: string
+  lastContributedText?: string
+}
+
 type FlyGhost = {
   id: string
   text: string
@@ -72,6 +78,9 @@ function App() {
   const [flyGhost, setFlyGhost] = useState<FlyGhost | null>(null)
   const flyLayerRef = useRef<HTMLDivElement | null>(null)
 
+  // Frontend-only stat: count how many times each community card id was dragged onto the board
+  const [communityDragCounts, setCommunityDragCounts] = useState<Record<string, number>>({})
+
   // Load persisted token on mount (so login survives refresh)
   useEffect(() => {
     const saved = localStorage.getItem('KNIT_BINGO_TOKEN')
@@ -80,6 +89,7 @@ function App() {
 
   const [draftBoard, setDraftBoard] = useState<BoardCard[]>(() => createEmptyBoard())
   const [savedBoard, setSavedBoard] = useState<BoardCard[]>(() => createEmptyBoard())
+  const [boardMeta, setBoardMeta] = useState<Record<number, BoardCardMeta>>({})
 
   // If we have a token, load the user's saved board. If no token is stored, do not call backend.
   useEffect(() => {
@@ -99,6 +109,12 @@ function App() {
       }
     })()
   }, [token, apiUrl])
+
+  // Always load community cards on app load
+  useEffect(() => {
+    loadCommunityCards()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const emailHasPlus = email.includes('+')
   const hasUnsavedChanges = JSON.stringify(draftBoard) !== JSON.stringify(savedBoard)
@@ -156,6 +172,24 @@ function App() {
       showAuthToast()
       return
     }
+
+    // Bulk update community card scores based on drag counts (authorized)
+    const scoreUpdates = Object.entries(communityDragCounts)
+      .filter(([, count]) => count > 0)
+      .map(([cardId, count]) => ({ cardId, count }))
+    if (scoreUpdates.length) {
+      await fetch(`${apiUrl}community/cards/score`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ updates: scoreUpdates }),
+      })
+      // reset local counts after successful send attempt
+      setCommunityDragCounts({})
+    }
+
     const resp = await fetch(`${apiUrl}bingo3x3`, {
       method: 'PUT',
       headers: {
@@ -189,6 +223,28 @@ function App() {
     }
     const card = draftBoard[index]
     if (!card) return
+    const trimmed = (card.text ?? '').trim()
+    if (!trimmed) {
+      setToast('Add text to a square before contributing.')
+      window.setTimeout(() => setToast(null), 2200)
+      return
+    }
+
+    const meta = boardMeta[index]
+    const lastContributedText = (meta?.lastContributedText ?? '').trim()
+    if (lastContributedText && trimmed === lastContributedText) {
+      setToast('You already contributed this square. Edit it to contribute again.')
+      window.setTimeout(() => setToast(null), 2400)
+      return
+    }
+    if (meta?.movedFromCommunityId) {
+      const baseline = (meta.movedFromCommunityText ?? '').trim()
+      if (trimmed === baseline) {
+        setToast('Edit this square before contributing it back to the community.')
+        window.setTimeout(() => setToast(null), 2400)
+        return
+      }
+    }
     const resp = await fetch(`${apiUrl}contribute`, {
       method: 'POST',
       headers: {
@@ -199,10 +255,19 @@ function App() {
     })
 
     if (resp.ok) {
+      setBoardMeta((prev) => ({
+        ...prev,
+        [index]: {
+          ...(prev[index] ?? {}),
+          lastContributedText: trimmed,
+        },
+      }))
+
       const rect = cardEl.getBoundingClientRect()
       const scroller = document.querySelector('[data-community-scroller]') as HTMLElement | null
       const toRect = scroller?.getBoundingClientRect()
       if (toRect) {
+        console.debug('contribute animation from', rect, 'to', toRect)
         setFlyGhost({
           id: crypto.randomUUID(),
           text: card.text,
@@ -210,6 +275,8 @@ function App() {
           from: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
           to: { x: toRect.left + 36, y: toRect.top + 48 },
         })
+      } else {
+        console.debug('contribute animation skipped: carousel target not found')
       }
     }
     // Refresh carousel (don’t clear local card)
@@ -299,6 +366,31 @@ function App() {
           editable
           tossable
           onCardContribute={contributeCardToCommunity}
+          onDropCommunityCard={(index, card) => {
+            setDraftBoard((prev) => {
+              const next = [...prev]
+              const existing = next[index]
+              if (!existing) return prev
+              next[index] = {
+                ...existing,
+                text: card.text ?? '',
+                backgroundColor: card.backgroundColor ?? existing.backgroundColor,
+              }
+              return next
+            })
+            setCommunityDragCounts((prev) => ({
+              ...prev,
+              [card.id]: (prev[card.id] ?? 0) + 1,
+            }))
+
+            setBoardMeta((prev) => ({
+              ...prev,
+              [index]: {
+                movedFromCommunityId: card.id,
+                movedFromCommunityText: card.text ?? '',
+              },
+            }))
+          }}
           onCardTextChange={(index, nextText) => {
             setDraftBoard((prev) => {
               const next = [...prev]
@@ -331,7 +423,7 @@ function App() {
         <div style={{ color: 'crimson', marginTop: 8 }}>Email must not contain '+' characters.</div>
       ) : null}
 
-      {!magicLink ? (
+      {!token && !magicLink ? (
         <button
           onClick={requestMagicLink}
           style={{
@@ -346,7 +438,7 @@ function App() {
 
       {error ? <div style={{ color: 'crimson', marginTop: 12 }}>{error}</div> : null}
 
-      {magicLink ? (
+      {!token && magicLink ? (
         <div style={{ marginTop: 16 }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>Enter magic code</label>
           <input
@@ -376,7 +468,6 @@ function App() {
                   }
                   setToken(data.token)
                   localStorage.setItem('KNIT_BINGO_TOKEN', data.token)
-                  await loadCommunityCards()
                 } catch (e) {
                   setError(e instanceof Error ? e.message : String(e))
                 }
@@ -478,8 +569,10 @@ function App() {
                 fontSize: 14,
                 textAlign: 'center',
                 padding: 14,
-                boxShadow: '0 14px 34px rgba(0,0,0,0.16)',
-                animation: 'contributeFly 520ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards',
+                boxShadow: '0 18px 44px rgba(0,0,0,0.28)',
+                border: '2px solid rgba(74, 31, 135, 0.55)',
+                opacity: 0.98,
+                animation: 'contributeFly 1000ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards',
               }}
               onAnimationEnd={() => setFlyGhost(null)}
             >

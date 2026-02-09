@@ -9,7 +9,13 @@ export type CommunityCarouselCard = {
   textColor?: string
 }
 
-export function CommunityCarousel({ cards }: { cards: CommunityCarouselCard[] }) {
+export function CommunityCarousel({
+  cards,
+  onDragStartCard,
+}: {
+  cards: CommunityCarouselCard[]
+  onDragStartCard?: (card: CommunityCarouselCard) => void
+}) {
   const [activeId, setActiveId] = useState<string | null>(cards[0]?.id ?? null)
   const [isPaused, setIsPaused] = useState(false)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
@@ -58,6 +64,12 @@ export function CommunityCarousel({ cards }: { cards: CommunityCarouselCard[] })
               type="button"
               className={[styles.peek, activeId === c.id ? styles.peekActive : ''].filter(Boolean).join(' ')}
               onClick={() => setActiveId(c.id)}
+              draggable
+              onDragStart={(e) => {
+                onDragStartCard?.(c)
+                e.dataTransfer.setData('application/knit-bingo-card', JSON.stringify(c))
+                e.dataTransfer.effectAllowed = 'copy'
+              }}
             >
               <BingoCard
                 text={activeId === c.id ? c.text : ''}

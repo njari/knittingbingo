@@ -48,6 +48,7 @@ magic_link_table = ddb.Table(os.environ["MAGIC_LINK_TABLE"])
 SEND_MAGIC_LINK = "/auth/magic-link"
 MAGIC_LINK_CALLBACK = "/auth/magic-link-callback"
 COMMUNITY_CARDS_LIST = "/community/cards"
+COMMUNITY_CARDS_SCORE = "/community/cards/score"
 OPEN_APIS = [SEND_MAGIC_LINK, MAGIC_LINK_CALLBACK, COMMUNITY_CARDS_LIST]
 
 
@@ -265,11 +266,13 @@ def handler(event, context):
 
             community_table.put_item(
                 Item={
-                    "pk": "COMMUNITY",
-                    "sk": f"CONTRIBUTE#{now}#{contribute_id}",
+                    "pk": f"CARD#{contribute_id}",
+                    "sk": "CARD",
                     "contributeId": contribute_id,
                     "contributedAt": now,
+                    "updatedAt": now,
                     "userId": user_id,
+                    "score": 0,
                     "card": card,
                 }
             )
@@ -291,8 +294,45 @@ def handler(event, context):
             for it in items:
                 card = it.get("card")
                 if card:
-                    cards.append(card)
+                    # include stable id + score in the returned card
+                    out = dict(card)
+                    out["id"] = it.get("contributeId") or it.get("pk", "").replace("CARD#", "")
+                    out["score"] = it.get("score", 0)
+                    cards.append(out)
             return _json(200, {"cards": cards})
+
+        # POST /community/cards/score
+        if method == "POST" and path == COMMUNITY_CARDS_SCORE:
+            token = _bearer_token(event)
+            _user_id_for_token(token)
+
+            updates = body.get("updates")
+            if not isinstance(updates, list):
+              return _json(400, {"message": "updates must be a list"})
+
+            # Store scores in the communitycards table under stable CARD#<id> keys.
+            now = datetime.now(timezone.utc).isoformat()
+            for u in updates:
+              if not isinstance(u, dict):
+                continue
+              card_id = u.get("cardId")
+              count = u.get("count")
+              if not isinstance(card_id, str) or not card_id:
+                continue
+              if not isinstance(count, int) or count <= 0:
+                continue
+
+              community_table.update_item(
+                Key={"pk": f"CARD#{card_id}", "sk": "CARD"},
+                UpdateExpression="SET score = if_not_exists(score, :z) + :inc, updatedAt = :u",
+                ExpressionAttributeValues={
+                  ":z": 0,
+                  ":inc": count,
+                  ":u": now,
+                },
+              )
+
+            return _json(200, {"ok": True})
 
         return _json(404, {"message": "Not Found"})
     except Exception as e:
