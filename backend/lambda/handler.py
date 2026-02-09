@@ -196,7 +196,7 @@ def handler(event, context):
             now = datetime.now(timezone.utc).isoformat()
 
             # 1) Resolve userId for this email (create one if missing)
-            mapping = usertable.get_item({"pk": f"EMAIL#{email}", "sk": "USER"})
+            mapping = usertable.get_item(Key={"pk": f"EMAIL#{email}", "sk": "USER"})
             if mapping and mapping.get("userId"):
                 user_id = mapping["userId"]
             else:
