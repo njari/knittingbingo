@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Knit Bingo backend (Lambda Function URL + DynamoDB)
+Description: Knit Bingo backend (Lambda Function URL + DynamoDB + SES)
 
 Parameters:
   LambdaCodeBucket:
@@ -8,6 +8,9 @@ Parameters:
   LambdaCodeKey:
     Type: String
     Default: backend/lambda.zip
+  SESFromAddress:
+    Type: String
+    Default: hello@nubrajarial.com
 
 Resources:
   UserTable:
@@ -68,6 +71,14 @@ Resources:
                 Resource:
                   - !GetAtt UserTable.Arn
                   - !GetAtt CommunityCardsTable.Arn
+        - PolicyName: SesSendEmail
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                Resource: '*'
 
   ApiFunction:
     Type: AWS::Lambda::Function
@@ -85,6 +96,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref UserTable
           COMMUNITY_CARDS_TABLE: !Ref CommunityCardsTable
+          SES_FROM_ADDRESS: !Ref SESFromAddress
 
   ApiFunctionUrl:
     Type: AWS::Lambda::Url

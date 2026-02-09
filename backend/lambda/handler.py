@@ -158,9 +158,18 @@ def handler(event, context):
                 }
             )
 
-            # Simulate sending email by returning link and logging
+            # Send magic code via SES
+            ses_from = os.environ["SES_FROM_ADDRESS"]
+            ses_client = boto3.client("ses")
+            ses_client.send_email(
+                Source=ses_from,
+                Destination={"ToAddresses": [email]},
+                Message={
+                    "Subject": {"Data": "Your Knit Bingo Magic Code"},
+                    "Body": {"Text": {"Data": f"Your magic code is: {code}"}},
+                },
+            )
             link = f"/auth/magic-link-callback?code={code}"
-            print(f"Magic link for {email}: {link}")
             return _json(200, {"magicLink": link})
 
         # GET /auth/magic-link-callback?code=...
