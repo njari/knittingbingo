@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 import boto3
-
+import base64
 
 class Bingo3x3Card(dict):
     """Backend representation of a single 3x3 bingo card.
@@ -132,15 +132,23 @@ def _user_id(event: dict) -> str:
         raise ValueError("Missing user identity (sub claim)")
     return sub
 
+def parse_body(event):
+    body = event.get("body") or ""
+    if event.get("isBase64Encoded"):
+        body = base64.b64decode(body).decode("utf-8")
+    return json.loads(body) if body else {}
+
 
 def handler(event, context):
     try:
+        print("🔥 HANDLER ENTERED 🔥")
+        print(json.dumps(event))
         method = event.get("httpMethod")
         path_params = event.get("pathParameters") or {}
         resource = event.get("resource")
         path = event.get("path")
         body_raw = event.get("body") or "{}"
-        body = json.loads(body_raw) if isinstance(body_raw, str) else body_raw
+        body = parse_body(event)
         # Auth endpoints are public, game endpoints require cognito claims.
         user_id = None
 
