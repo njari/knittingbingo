@@ -78,6 +78,22 @@ function App() {
   const emailHasPlus = email.includes('+')
   const hasUnsavedChanges = JSON.stringify(draftBoard) !== JSON.stringify(savedBoard)
 
+  const lavender = '#EDE4FF'
+  const lavenderHover = '#E7DAFF'
+  const violet = '#5A2CA0'
+  const violetDeep = '#4A1F87'
+  const cream = '#FFF7E8'
+
+  const primaryButtonStyle: React.CSSProperties = {
+    padding: '10px 14px',
+    borderRadius: 10,
+    background: lavender,
+    border: `2px solid ${violet}`,
+    color: violetDeep,
+    fontWeight: 800,
+    cursor: 'pointer',
+  }
+
   async function requestMagicLink() {
     setError(null)
     setMagicLink(null)
@@ -187,16 +203,65 @@ function App() {
   }
 
   return (
-    <div style={{ display: 'flex', maxWidth: 1040, margin: '0 auto', gap: 28 }}>
+    <div style={{ position: 'relative', minHeight: '100vh' }}>
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        onCanPlay={(e) => {
+          // slow down playback for a calmer background
+          ;(e.currentTarget as HTMLVideoElement).playbackRate = 0.1
+        }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          /* tile video rather than scaling it */
+          objectFit: 'none',
+          objectPosition: 'center',
+          zIndex: -2,
+        }}
+        src="/chamomile%20float.mp4"
+      />
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(255,255,255,0.65)',
+          backdropFilter: 'blur(2px)',
+          zIndex: -1,
+        }}
+      />
+
+      <div style={{ display: 'flex', maxWidth: 1040, margin: '0 auto', gap: 28 }}>
       <div style={{ flex: 1, padding: 24, textAlign: 'left' }}>
-      <h1>Make Your Own Knitting Bingo</h1>
+      <h1
+        style={{
+          marginTop: 0,
+          fontFamily: 'ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
+          fontSize: 34,
+          fontWeight: 800,
+          letterSpacing: -0.2,
+          color: lavender,
+          WebkitTextStroke: `2px ${violet}`,
+          textShadow: '0 10px 24px rgba(90, 44, 160, 0.22)',
+          opacity: 0.88,
+        }}
+      >
+        Make Your Own Knitting Bingo
+      </h1>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '16px 0' }}>
         <button
           type="button"
           onClick={saveBoardToBackend}
           disabled={!hasUnsavedChanges || !token}
-          style={{ padding: '10px 14px', borderRadius: 8 }}
+          style={{
+            ...primaryButtonStyle,
+            opacity: !hasUnsavedChanges || !token ? 0.6 : 1,
+          }}
         >
           Save
         </button>
@@ -232,7 +297,9 @@ function App() {
           width: '100%',
           padding: 10,
           borderRadius: 6,
-          border: '1px solid #ccc',
+          border: `2px solid ${violet}`,
+          background: cream,
+          color: violetDeep,
           outline: pulseEmail ? '3px solid rgba(164, 214, 255, 0.85)' : undefined,
           boxShadow: pulseEmail ? '0 0 0 6px rgba(164, 214, 255, 0.22)' : undefined,
           transition: 'box-shadow 200ms ease, outline 200ms ease',
@@ -245,7 +312,10 @@ function App() {
       {!magicLink ? (
         <button
           onClick={requestMagicLink}
-          style={{ marginTop: 12, padding: '10px 14px', borderRadius: 6 }}
+          style={{
+            ...primaryButtonStyle,
+            marginTop: 12,
+          }}
           disabled={!email || emailHasPlus}
         >
           Send magic code
@@ -267,7 +337,10 @@ function App() {
           <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
             <button
               type="button"
-              style={{ padding: '8px 12px', borderRadius: 6 }}
+              style={{
+                ...primaryButtonStyle,
+                padding: '8px 12px',
+              }}
               onClick={async () => {
                 try {
                   setError(null)
@@ -291,7 +364,11 @@ function App() {
 
             <button
               type="button"
-              style={{ padding: '8px 12px', borderRadius: 6 }}
+              style={{
+                ...primaryButtonStyle,
+                padding: '8px 12px',
+                background: lavenderHover,
+              }}
               onClick={() => {
                 // allow restarting the flow
                 setMagicLink(null)
@@ -412,6 +489,7 @@ function App() {
         </div>,
         document.body
       )}
+      </div>
     </div>
   )
 }
