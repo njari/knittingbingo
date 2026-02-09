@@ -136,8 +136,6 @@ def parse_body(event):
 
 def handler(event, context):
     try:
-        logger.info("🔥 HANDLER ENTERED 🔥")
-        logger.info(json.dumps(event))
         method = event["requestContext"]["http"]["method"]
         path = event["rawPath"]
         # Auth endpoints are public, game endpoints require cognito claims.
@@ -189,9 +187,8 @@ def handler(event, context):
             "sk": "MAGIC",
         }
         )
-            items = resp.get("Items") or []
-            print(items)
-            if not items:
+            item = resp.get("Item")
+            if not item:
                 return _json(404, {"message": "Invalid code"})
             email = items[0]["email"]
 
