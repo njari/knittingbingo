@@ -6,6 +6,11 @@ from datetime import datetime, timezone
 import boto3
 import base64
 
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 print("IS THIS IMPORTED")
 
 class Bingo3x3Card(dict):
@@ -143,8 +148,8 @@ def parse_body(event):
 
 def handler(event, context):
     try:
-        print("🔥 HANDLER ENTERED 🔥")
-        print(json.dumps(event))
+        logger.info("🔥 HANDLER ENTERED 🔥")
+        logger.info(json.dumps(event))
         method = event["requestContext"]["http"]["method"]
         path = event["rawPath"]
         # Auth endpoints are public, game endpoints require cognito claims.
