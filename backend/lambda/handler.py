@@ -171,7 +171,7 @@ def handler(event, context):
                 },
             )
             link = f"/auth/magic-link-callback?code={code}"
-            return _json(200, {"magicLink": link})
+            return _json(200, {})
 
         # GET /auth/magic-link-callback?code=...
         if method == "GET" and path == MAGIC_LINK_CALLBACK:
@@ -190,14 +190,13 @@ def handler(event, context):
             item = resp.get("Item")
             if not item:
                 return _json(404, {"message": "Invalid code"})
-            email = item[0]["email"]
+            email = item['email']
 
             # Upsert user-by-email without overwriting createdAt if user exists.
             now = datetime.now(timezone.utc).isoformat()
 
             # 1) Resolve userId for this email (create one if missing)
-            mapping_key = {"pk": f"EMAIL#{email}", "sk": "USER"}
-            mapping = usertable.get_item(Key=mapping_key).get("Item")
+            mapping = usertable.get_item({"pk": f"EMAIL#{email}", "sk": "USER"})
             if mapping and mapping.get("userId"):
                 user_id = mapping["userId"]
             else:
