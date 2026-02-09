@@ -187,11 +187,10 @@ def handler(event, context):
             Key={
             "pk": f"CODE#{code}",
             "sk": "MAGIC",
-        },
-        ConsistentRead=True,
-    )
-
+        }
+        )
             items = resp.get("Items") or []
+            print(items)
             if not items:
                 return _json(404, {"message": "Invalid code"})
             email = items[0]["email"]
