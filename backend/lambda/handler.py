@@ -190,7 +190,7 @@ def handler(event, context):
             item = resp.get("Item")
             if not item:
                 return _json(404, {"message": "Invalid code"})
-            email = items[0]["email"]
+            email = item[0]["email"]
 
             # Upsert user-by-email without overwriting createdAt if user exists.
             now = datetime.now(timezone.utc).isoformat()
