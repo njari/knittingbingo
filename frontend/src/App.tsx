@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { BingoBoard } from './components/BingoBoard'
 import { CommunityCarousel, type CommunityCarouselCard } from './components/CommunityCarousel'
@@ -72,8 +72,33 @@ function App() {
   const [flyGhost, setFlyGhost] = useState<FlyGhost | null>(null)
   const flyLayerRef = useRef<HTMLDivElement | null>(null)
 
+  // Load persisted token on mount (so login survives refresh)
+  useEffect(() => {
+    const saved = localStorage.getItem('KNIT_BINGO_TOKEN')
+    if (saved) setToken(saved)
+  }, [])
+
   const [draftBoard, setDraftBoard] = useState<BoardCard[]>(() => createEmptyBoard())
   const [savedBoard, setSavedBoard] = useState<BoardCard[]>(() => createEmptyBoard())
+
+  // If we have a token, load the user's saved board. If no token is stored, do not call backend.
+  useEffect(() => {
+    ;(async () => {
+      if (!token || !apiUrl) return
+      try {
+        const resp = await fetch(`${apiUrl}bingo3x3`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const data = (await resp.json()) as { cards?: BoardCard[] }
+        if (resp.ok && Array.isArray(data.cards) && data.cards.length === 9) {
+          setDraftBoard(data.cards)
+          setSavedBoard(data.cards)
+        }
+      } catch {
+        // ignore
+      }
+    })()
+  }, [token, apiUrl])
 
   const emailHasPlus = email.includes('+')
   const hasUnsavedChanges = JSON.stringify(draftBoard) !== JSON.stringify(savedBoard)
@@ -116,7 +141,8 @@ function App() {
       setError(data.message ?? `Request failed (${resp.status})`)
       return
     }
-    setMagicLink("you can't see this")
+    // backend sends the code via email; frontend doesn't need the link/code
+    setMagicLink('sent')
     setMagicCode('')
   }
 
@@ -349,6 +375,7 @@ function App() {
                     throw new Error(data.message ?? `Verification failed (${resp.status})`)
                   }
                   setToken(data.token)
+                  localStorage.setItem('KNIT_BINGO_TOKEN', data.token)
                   await loadCommunityCards()
                 } catch (e) {
                   setError(e instanceof Error ? e.message : String(e))
@@ -369,6 +396,8 @@ function App() {
                 // allow restarting the flow
                 setMagicLink(null)
                 setMagicCode('')
+                setToken(null)
+                localStorage.removeItem('KNIT_BINGO_TOKEN')
               }}
             >
               Start over

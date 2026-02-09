@@ -245,6 +245,15 @@ def handler(event, context):
             save_bingo_3x3_for_user(user_id=user_id, cards=cards)
             return _json(200, {"ok": True})
 
+        # GET /bingo3x3
+        if method == "GET" and path == "/bingo3x3":
+            token = _bearer_token(event)
+            user_id = _user_id_for_token(token)
+            resp = usertable.get_item(Key={"pk": f"USER#{user_id}", "sk": "PROFILE"})
+            item = resp.get("Item") or {}
+            cards = item.get(BINGO_3X3_KEY)
+            return _json(200, {"cards": cards or []})
+
         # POST /contribute
         if method == "POST" and path == "/contribute":
             token = _bearer_token(event)
