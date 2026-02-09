@@ -127,17 +127,17 @@ def _user_id_for_token(token: str) -> str:
     return items[0]["userId"]
 
 
-def _user_id(event: dict) -> str:
-    # API Gateway (REST) + Cognito authorizer injects claims here
-    claims = (
-        event.get("requestContext", {})
-        .get("authorizer", {})
-        .get("claims", {})
-    )
-    sub = claims.get("sub")
-    if not sub:
-        raise ValueError("Missing user identity (sub claim)")
-    return sub
+# def _user_id(event: dict) -> str:
+#     # API Gateway (REST) + Cognito authorizer injects claims here
+#     claims = (
+#         event.get("requestContext", {})
+#         .get("authorizer", {})
+#         .get("claims", {})
+#     )
+#     sub = claims.get("sub")
+#     if not sub:
+#         raise ValueError("Missing user identity (sub claim)")
+#     return sub
 
 def parse_body(event):
     body = event.get("body") or ""
@@ -155,8 +155,6 @@ def handler(event, context):
         # Auth endpoints are public, game endpoints require cognito claims.
         user_id = None
 
-        if path not in OPEN_APIS:
-            user_id = _user_id(event)
 
         # POST /auth/magic-link
         
