@@ -12,6 +12,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 print("IS THIS IMPORTED")
+logger.warning("PRETTY PLEASE")
 
 class Bingo3x3Card(dict):
     """Backend representation of a single 3x3 bingo card.
@@ -39,11 +40,10 @@ class Bingo3x3Card(dict):
         return Bingo3x3Card({"id": card_id, "text": text, "backgroundColor": background_color})
 
 
-TABLE_NAME = os.environ["TABLE_NAME"]
-COMMUNITY_CARDS_TABLE = os.environ["COMMUNITY_CARDS_TABLE"]
 ddb = boto3.resource("dynamodb")
-table = ddb.Table(TABLE_NAME)
-community_table = ddb.Table(COMMUNITY_CARDS_TABLE)\
+usertable = ddb.Table(os.environ["USER_TABLE"])
+community_table = ddb.Table(os.environ["COMMUNITY_CARDS_TABLE"])
+magic_link_table = ddb.Table(os.environ["MAGIC_LINK_TABLE"])
 
 SEND_MAGIC_LINK = "/auth/magic-link"
 MAGIC_LINK_CALLBACK = "/auth/magic-link-callback"
@@ -65,7 +65,7 @@ def save_bingo_3x3_for_user(*, user_id: str, cards: list):
     cards = [Bingo3x3Card.from_dict(c) for c in cards]
 
     now = datetime.now(timezone.utc).isoformat()
-    table.update_item(
+    usertable.update_item(
         Key={"pk": f"USER#{user_id}", "sk": "PROFILE"},
         UpdateExpression=f"SET {BINGO_3X3_KEY} = :b, updatedAt = :u",
         ExpressionAttributeValues={
@@ -109,7 +109,7 @@ def _bearer_token(event: dict) -> str:
 
 def _user_id_for_token(token: str) -> str:
     # v1: scan profile items. Later add a GSI (authToken -> userId).
-    resp = table.scan(
+    resp = magic_link_table.scan(
         FilterExpression="#sk = :profile AND #authToken = :t",
         ExpressionAttributeNames={
             "#sk": "sk",
@@ -127,18 +127,6 @@ def _user_id_for_token(token: str) -> str:
     return items[0]["userId"]
 
 
-# def _user_id(event: dict) -> str:
-#     # API Gateway (REST) + Cognito authorizer injects claims here
-#     claims = (
-#         event.get("requestContext", {})
-#         .get("authorizer", {})
-#         .get("claims", {})
-#     )
-#     sub = claims.get("sub")
-#     if not sub:
-#         raise ValueError("Missing user identity (sub claim)")
-#     return sub
-
 def parse_body(event):
     body = event.get("body") or ""
     if event.get("isBase64Encoded"):
@@ -153,8 +141,8 @@ def handler(event, context):
         method = event["requestContext"]["http"]["method"]
         path = event["rawPath"]
         # Auth endpoints are public, game endpoints require cognito claims.
-        user_id = None
-
+        user_id = str(uuid.uuid4())
+        body = parse_body(event=event)
 
         # POST /auth/magic-link
         
@@ -163,16 +151,15 @@ def handler(event, context):
             code = str(uuid.uuid4())
             now = datetime.now(timezone.utc).isoformat()
 
-            # store forever-valid code (v1) mapped to email
-            table.put_item(
-                Item={
-                    "pk": f"EMAIL#{email}",
-                    "sk": "MAGIC",
-                    "email": email,
-                    "code": code,
-                    "createdAt": now,
-                }
-            )
+            magic_link_table.put_item(
+            Item={
+            "pk": f"CODE#{code}",
+            "sk": "MAGIC",
+            "userId": user_id,
+            "email": email,
+            "createdAt": now
+        }
+        )  
 
             # Send magic code via SES
             ses_from = os.environ["SES_FROM_ADDRESS"]
@@ -196,18 +183,14 @@ def handler(event, context):
                 return _json(400, {"message": "Missing code"})
 
             # Look up email by code: scan (acceptable for v1). Later add GSI.
-            resp = table.scan(
-                FilterExpression="#sk = :magic AND #code = :code",
-                ExpressionAttributeNames={
-                    "#sk": "sk",
-                    "#code": "code",
-                },
-                ExpressionAttributeValues={
-                    ":magic": "MAGIC",
-                    ":code": code,
-                },
-                Limit=1,
-            )
+            resp = magic_link_table.get_item(
+            Key={
+            "pk": f"CODE#{code}",
+            "sk": "MAGIC",
+        },
+        ConsistentRead=True,
+    )
+
             items = resp.get("Items") or []
             if not items:
                 return _json(404, {"message": "Invalid code"})
@@ -218,12 +201,12 @@ def handler(event, context):
 
             # 1) Resolve userId for this email (create one if missing)
             mapping_key = {"pk": f"EMAIL#{email}", "sk": "USER"}
-            mapping = table.get_item(Key=mapping_key).get("Item")
+            mapping = usertable.get_item(Key=mapping_key).get("Item")
             if mapping and mapping.get("userId"):
                 user_id = mapping["userId"]
             else:
                 user_id = str(uuid.uuid4())
-                table.put_item(
+                usertable.put_item(
                     Item={
                         "pk": f"EMAIL#{email}",
                         "sk": "USER",
@@ -236,7 +219,7 @@ def handler(event, context):
 
             # 2) Create profile if missing (set createdAt once)
             try:
-                table.put_item(
+                usertable.put_item(
                     Item={
                         "pk": f"USER#{user_id}",
                         "sk": "PROFILE",
@@ -251,14 +234,15 @@ def handler(event, context):
                 pass
 
             # 3) Always update token + lastLoginAt (but not createdAt)
-            table.update_item(
-                Key={"pk": f"USER#{user_id}", "sk": "PROFILE"},
-                UpdateExpression="SET authToken = :t, lastLoginAt = :l",
-                ExpressionAttributeValues={
-                    ":t": code,
-                    ":l": now,
-                },
-            )
+
+            magic_link_table.put_item(
+            Item={
+            "pk": f"CODE#{code}",
+            "sk": "AUTH_TOKEN",
+            "userId": user_id,
+            "createdAt": now
+        }
+        )
 
             return _json(200, {"token": code, "userId": user_id, "email": email})
 

@@ -45,6 +45,22 @@ Resources:
         - AttributeName: sk
           KeyType: RANGE
 
+  MagicLinkTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: magiclink
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
   ApiFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -71,6 +87,7 @@ Resources:
                 Resource:
                   - !GetAtt UserTable.Arn
                   - !GetAtt CommunityCardsTable.Arn
+                  - !GetAtt MagicLinkTable.Arn
         - PolicyName: SesSendEmail
           PolicyDocument:
             Version: '2012-10-17'
@@ -94,8 +111,9 @@ Resources:
         S3Key: !Ref LambdaCodeKey
       Environment:
         Variables:
-          TABLE_NAME: !Ref UserTable
+          USER_TABLE: !Ref UserTable
           COMMUNITY_CARDS_TABLE: !Ref CommunityCardsTable
+          MAGIC_LINK_TABLE: !Ref MagicLinkTable
           SES_FROM_ADDRESS: !Ref SESFromAddress
 
   ApiFunctionUrl:
