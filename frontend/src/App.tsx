@@ -116,11 +116,7 @@ function App() {
       setError(data.message ?? `Request failed (${resp.status})`)
       return
     }
-    if (!data.magicLink) {
-      setError('No magic link returned by API')
-      return
-    }
-    setMagicLink(data.magicLink)
+    setMagicLink("you can't see this")
     setMagicCode('')
   }
 

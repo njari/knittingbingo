@@ -201,16 +201,21 @@ def handler(event, context):
                 user_id = mapping["userId"]
             else:
                 user_id = str(uuid.uuid4())
-                usertable.put_item(
-                    Item={
-                        "pk": f"EMAIL#{email}",
-                        "sk": "USER",
-                        "email": email,
-                        "userId": user_id,
-                        "createdAt": now,
-                    },
-                    ConditionExpression="attribute_not_exists(pk)",
-                )
+                try: 
+                    usertable.put_item(
+                        Item={
+                            "pk": f"EMAIL#{email}",
+                            "sk": "USER",
+                            "email": email,
+                            "userId": user_id,
+                            "createdAt": now,
+                        },
+                        ConditionExpression="attribute_not_exists(pk)",
+                    )
+                except Exception:
+                # already exists
+                    pass
+                    
 
             # 2) Create profile if missing (set createdAt once)
             try:
