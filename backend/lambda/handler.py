@@ -109,22 +109,13 @@ def _bearer_token(event: dict) -> str:
 
 def _user_id_for_token(token: str) -> str:
     # v1: scan profile items. Later add a GSI (authToken -> userId).
-    resp = magic_link_table.scan(
-        FilterExpression="#sk = :profile AND #authToken = :t",
-        ExpressionAttributeNames={
-            "#sk": "sk",
-            "#authToken": "authToken",
-        },
-        ExpressionAttributeValues={
-            ":profile": "PROFILE",
-            ":t": token,
-        },
-        Limit=1,
-    )
-    items = resp.get("Items") or []
-    if not items:
+    
+    resp = magic_link_table.get_item(Key= {"pk": f"CODE#{token}",
+            "sk": "AUTH_TOKEN"})
+    item = resp.get("Item") 
+    if not item:
         raise ValueError("Invalid token")
-    return items[0]["userId"]
+    return item["userId"]
 
 
 def parse_body(event):
