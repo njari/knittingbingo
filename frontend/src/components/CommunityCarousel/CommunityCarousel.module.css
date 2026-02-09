@@ -28,6 +28,30 @@
 
 .cardWrap {
   scroll-snap-align: start;
+  position: relative;
+}
+
+.scoreBadge {
+  position: absolute;
+  top: -6px;
+  right: 10px;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #4A1F87;
+  background: rgba(237, 228, 255, 0.95);
+  border: 2px solid rgba(90, 44, 160, 0.55);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.6),
+    0 0 18px rgba(164, 214, 255, 0.75),
+    0 10px 20px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
 
 .peek {

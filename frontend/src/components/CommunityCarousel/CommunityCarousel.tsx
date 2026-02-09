@@ -7,6 +7,7 @@ export type CommunityCarouselCard = {
   text: string
   backgroundColor?: string
   textColor?: string
+  score?: number
 }
 
 export function CommunityCarousel({
@@ -60,6 +61,7 @@ export function CommunityCarousel({
       >
         {loopCards.map((c, idx) => (
           <div key={`${c.id}-${idx}`} className={styles.cardWrap}>
+            {c.score && c.score > 0 ? <div className={styles.scoreBadge}>{c.score}</div> : null}
             <button
               type="button"
               className={[styles.peek, activeId === c.id ? styles.peekActive : ''].filter(Boolean).join(' ')}
