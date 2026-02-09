@@ -36,8 +36,12 @@ TABLE_NAME = os.environ["TABLE_NAME"]
 COMMUNITY_CARDS_TABLE = os.environ["COMMUNITY_CARDS_TABLE"]
 ddb = boto3.resource("dynamodb")
 table = ddb.Table(TABLE_NAME)
-community_table = ddb.Table(COMMUNITY_CARDS_TABLE)
-OPEN_APIS = ["/auth/magic-link", "/auth/magic-link-callback", "/community/cards"]
+community_table = ddb.Table(COMMUNITY_CARDS_TABLE)\
+
+SEND_MAGIC_LINK = "/auth/magic-link"
+MAGIC_LINK_CALLBACK = "/auth/magic-link-callback"
+COMMUNITY_CARDS_LIST = "/community/cards"
+OPEN_APIS = [SEND_MAGIC_LINK, MAGIC_LINK_CALLBACK, COMMUNITY_CARDS_LIST]
 
 
 BINGO_3X3_KEY = "bingo3x3"
@@ -134,15 +138,17 @@ def handler(event, context):
         method = event.get("httpMethod")
         path_params = event.get("pathParameters") or {}
         resource = event.get("resource")
+        path = event.get("path")
         body_raw = event.get("body") or "{}"
         body = json.loads(body_raw) if isinstance(body_raw, str) else body_raw
         # Auth endpoints are public, game endpoints require cognito claims.
         user_id = None
-        if resource not in OPEN_APIS:
+        if path not in OPEN_APIS:
             user_id = _user_id(event)
 
         # POST /auth/magic-link
-        if method == "POST" and resource == "/auth/magic-link":
+        
+        if method == "POST" and path == SEND_MAGIC_LINK:
             email = _validate_email(body.get("email"))
             code = str(uuid.uuid4())
             now = datetime.now(timezone.utc).isoformat()
@@ -173,7 +179,7 @@ def handler(event, context):
             return _json(200, {"magicLink": link})
 
         # GET /auth/magic-link-callback?code=...
-        if method == "GET" and resource == "/auth/magic-link-callback":
+        if method == "GET" and path == MAGIC_LINK_CALLBACK:
             qs = event.get("queryStringParameters") or {}
             code = qs.get("code")
             if not code:
@@ -247,7 +253,7 @@ def handler(event, context):
             return _json(200, {"token": code, "userId": user_id, "email": email})
 
         # PUT /bingo3x3
-        if method == "PUT" and resource == "/bingo3x3":
+        if method == "PUT" and path == "/bingo3x3":
             token = _bearer_token(event)
             user_id = _user_id_for_token(token)
             cards = body.get("cards")
@@ -255,7 +261,7 @@ def handler(event, context):
             return _json(200, {"ok": True})
 
         # POST /contribute
-        if method == "POST" and resource == "/contribute":
+        if method == "POST" and path == "/contribute":
             token = _bearer_token(event)
             user_id = _user_id_for_token(token)
 
@@ -277,7 +283,7 @@ def handler(event, context):
             return _json(201, {"ok": True, "contributeId": contribute_id})
 
         # GET /community/cards
-        if method == "GET" and resource == "/community/cards":
+        if method == "GET" and path == COMMUNITY_CARDS_LIST:
             # v1: scan. Later: GSI or use pk='COMMUNITY' + query.
             resp = community_table.scan(Limit=50)
             items = resp.get("Items") or []
