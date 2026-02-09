@@ -143,6 +143,12 @@ def handler(event, context):
         body = json.loads(body_raw) if isinstance(body_raw, str) else body_raw
         # Auth endpoints are public, game endpoints require cognito claims.
         user_id = None
+
+        print("httpMethod:", event.get("httpMethod"))
+        print("resource:", event.get("resource"))
+        print("path:", event.get("path"))
+        print("pathParameters:", json.dumps(event.get("pathParameters"), indent=2))
+        print("body:", event.get("body"))
         if path not in OPEN_APIS:
             user_id = _user_id(event)
 
