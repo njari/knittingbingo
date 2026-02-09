@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 import boto3
 import base64
 
+print("IS THIS IMPORTED")
+
 class Bingo3x3Card(dict):
     """Backend representation of a single 3x3 bingo card.
 
