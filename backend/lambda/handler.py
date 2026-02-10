@@ -1,3 +1,4 @@
+from decimal import Decimal
 import json
 import os
 import uuid
@@ -54,6 +55,13 @@ OPEN_APIS = [SEND_MAGIC_LINK, MAGIC_LINK_CALLBACK, COMMUNITY_CARDS_LIST]
 
 BINGO_3X3_KEY = "bingo3x3"
 
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # choose int or float depending on your needs
+            return int(obj)
+        return super().default(obj)
+
 
 def save_bingo_3x3_for_user(*, user_id: str, cards: list):
     """Persist a 3x3 (9-card) board onto the user's PROFILE item.
@@ -93,7 +101,7 @@ def _json(status_code: int, body: dict):
         "headers": {
             "Content-Type": "application/json",
         },
-        "body": json.dumps(body),
+        "body": json.dumps(body, cls=DecimalEncoder),
     }
 
 
