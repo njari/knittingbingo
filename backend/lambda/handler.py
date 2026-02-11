@@ -290,7 +290,7 @@ def handler(event, context):
         # GET /community/cards
         if method == "GET" and path == COMMUNITY_CARDS_LIST:
             # v1: scan. Later: GSI or use pk='COMMUNITY' + query.
-            resp = community_table.scan(Limit=50)
+            resp = community_table.scan(Limit=500)
             items = resp.get("Items") or []
 
             # sort newest first (by contributedAt if present, else by sk)

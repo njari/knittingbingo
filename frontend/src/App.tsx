@@ -73,6 +73,7 @@ function App() {
   const [magicCode, setMagicCode] = useState('')
   const [token, setToken] = useState<string | null>(null)
   const [communityCards, setCommunityCards] = useState<CommunityCarouselCard[]>(() => DEFAULT_COMMUNITY_CARDS)
+  const [lastCommunityFetchAt, setLastCommunityFetchAt] = useState<number>(0)
   const [toast, setToast] = useState<string | null>(null)
   const [pulseEmail, setPulseEmail] = useState(false)
   const [flyGhost, setFlyGhost] = useState<FlyGhost | null>(null)
@@ -212,6 +213,15 @@ function App() {
     const data = (await resp.json()) as { cards?: CommunityCarouselCard[] }
     if (resp.ok && Array.isArray(data.cards)) {
       setCommunityCards(data.cards.length ? data.cards : DEFAULT_COMMUNITY_CARDS)
+      setLastCommunityFetchAt(Date.now())
+    }
+  }
+
+  async function maybeRefreshCommunityCards() {
+    const now = Date.now()
+    const TWO_MIN = 2 * 60 * 1000
+    if (!lastCommunityFetchAt || now - lastCommunityFetchAt >= TWO_MIN) {
+      await loadCommunityCards()
     }
   }
 
@@ -279,8 +289,8 @@ function App() {
         console.debug('contribute animation skipped: carousel target not found')
       }
     }
-    // Refresh carousel (don’t clear local card)
-    await loadCommunityCards()
+    // Refresh carousel at most once per 2 minutes
+    await maybeRefreshCommunityCards()
   }
 
   function showAuthToast() {
